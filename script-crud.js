@@ -28,7 +28,14 @@ const taskIconSvg =`
 let tarefaSelecionada = null
 let itemTarefaSelecionada = null
 
+let tarefaEmEdicao = null
+let paragraphEmEdicao = null
+
 const selecionaTarefa = (tarefa, elemento) => {
+
+    if(tarefa.concluida){
+        return
+    }
 
     document.querySelectorAll('.app__section-task-list-item-active').forEach(function (button) {
         button.classList.remove('app__section-task-list-item-active')
@@ -48,8 +55,23 @@ const selecionaTarefa = (tarefa, elemento) => {
     }
 
 const limparForm = () => {
+    tarefaEmEdicao = null
+    paragraphEmEdicao = null
     textArea.value = ''
     formTask.classList.add('hidden')
+}
+
+const selecionaTarefaParaEditar = (tarefa,elemento) => {
+    if(tarefaEmEdicao == tarefa) {
+        limparForm()
+        return
+    }
+
+    formLabel.textContent='Editando tarefa'
+    tarefaEmEdicao=tarefa
+    paragraphEmEdicao=elemento
+    textArea.value = tarefa.descricao
+    formTask.classList.remove('hidden')
 }
 
 function createTask(tarefa) {
@@ -66,14 +88,27 @@ function createTask(tarefa) {
 
     const button = document.createElement('button')
 
+    button.classList.add('app_button-edit')
+    const editIcon = document.createElement('img')
+    editIcon.setAttribute('src', '/imagens/edit.png')
+
+    button.addEventListener('click', (event) => {
+        event.stopPropagation()
+        selecionaTarefaParaEditar(tarefa, paragraph)
+    })
+
     li.onclick = () => {
         selecionaTarefa(tarefa, li)
     }
 
     svgIcon.addEventListener('click', (event) => {
-        event.stopPropagation()
-        button.setAttribute('disabled', true)
-        li.classList.add('app__section-task-list-item-complete')
+        if(tarefa==tarefaSelecionada) {
+            event.stopPropagation()
+            button.setAttribute('disabled', true)
+            li.classList.add('app__section-task-list-item-complete')
+            tarefaSelecionada.concluida = true
+            updateLocalStorage()
+        }
     })
 
     if(tarefa.concluida) {
@@ -83,6 +118,8 @@ function createTask(tarefa) {
 
     li.appendChild(svgIcon)
     li.appendChild(paragraph)
+    li.appendChild(button)
+    button.appendChild(editIcon)
 
     return li
 }
@@ -101,8 +138,28 @@ const updateLocalStorage = () => {
     localStorage.setItem('tarefas', JSON.stringify(tarefas))
 }
 
+deleteFormTaskBtn.addEventListener('click', (evento => {
+    if(tarefaSelecionada) {
+        const index = tarefas.indexOf(tarefaSelecionada)
+        if(index !== -1) {
+            tarefas.splice(index, 1)
+        }
+
+        itemTarefaSelecionada.remove()
+        tarefas.filter(t=> t!= tarefaSelecionada)
+        itemTarefaSelecionada = null
+        tarefaSelecionada = null
+    }
+    updateLocalStorage()
+    limparForm()
+}))
+
 formTask.addEventListener('submit', (evento) => {
     evento.preventDefault()
+    if(tarefaEmEdicao){
+        tarefaEmEdicao.descricao = textArea.value
+        paragraphEmEdicao.textContent = textArea.value
+    } else {
 
     const task = {
         descricao: textArea.value,
@@ -112,9 +169,19 @@ formTask.addEventListener('submit', (evento) => {
     tarefas.push(task)
     const taskItem = createTask(task)
     taskListContainer.appendChild(taskItem)
-    
+}
+
     updateLocalStorage()
     limparForm()
+})
+
+document.addEventListener('TarefaFinalizada', function(e){
+    if(tarefaSelecionada) {
+        tarefaSelecionada.concluida = true
+        itemTarefaSelecionada.classList.add('app__section-task-list-item-complete')
+        itemTarefaSelecionada.querySelector('button').setAttribute('disabled', true)
+        updateLocalStorage()
+    }
 })
 
 cancelFormTaskBtn.addEventListener('click', () => {
@@ -123,7 +190,20 @@ cancelFormTaskBtn.addEventListener('click', () => {
     limparForm()
 })
 
-deleteFormTaskBtn.addEventListener('click', (event) => {
-    event.preventDefault()
+const btnDeletarConcluidas = document.querySelector('#btn-remover-concluidas')
+const btnDeletarTodas = document.querySelector('#btn-remover-todas')
 
-})
+const removerTarefas = (somenteConcluidas) => {
+    const seletor = somenteConcluidas ? '.app__section-task-list-item-complete' : '.app__section-task-list-item'
+    document.querySelectorAll(seletor).forEach((element) => {
+        element.remove();
+    });
+
+    tarefas = somenteConcluidas ? tarefas.filter(t => !t.concluida) : []
+    updateLocalStorage()
+}
+
+btnDeletarConcluidas.addEventListener('click', () => removerTarefas(true))
+btnDeletarTodas.addEventListener('click', () => removerTarefas(false))
+
+
